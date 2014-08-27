@@ -2,26 +2,29 @@
 import requests
 import json
 import logging
+from horizon import messages
 
 from django.conf import settings
 
+try:
+    from horizon_monitoring.utils.kedb_client import kedb_api
+    host = settings.KEDB_HOST
+    include_kedb = True
+except:
+    include_kedb = False
+
 log = logging.getLogger('utils.sensu')
 
-class Sensu(object):
+from horizon_contrib.api.base import BaseClient
+
+class Sensu(BaseClient):
 
     host = settings.SENSU_HOST
     port = settings.SENSU_PORT
+    api_prefix = ""
 
     def __init__(self):
         pass
-
-    def request(self, path):
-        request = requests.get('%s%s' % (self.api, path))
-        return request.json()
-
-    @property
-    def api(self):
-        return 'http://%s:%s' % (self.host, self.port)
 
     @property
     def check_list(self):
@@ -32,23 +35,27 @@ class Sensu(object):
         response = requests.get(url)
         return response.json()
 
-    def check_silence(self, check, client, expire, content):
-        payload = { "path": '%s/%s' % (client, check), "expire": expire, "content": content }
-        url = '%s/stashes' % self.api
-        response = requests.post(url, data=json.dumps(payload))
-        return response
+    def silence(self, payload):
+        """
+        {
+          "path": "random_stash",
+          "expire": 60,
+          "content": {
+            "reason": "things are stashy"
+          }
+        }
+        """ 
+        url = '/stashes'
+        return self.request(url, "POST", payload)
 
     def check_request(self, check, subscibers):
         payload = { "subscibers": subscibers, "check": check }
-        url = '%s/request' % self.api
-        response = requests.post(url, data=json.dumps(payload))
-        return response
+        url = '/request'
+        return self.request(url, "POST", payload)
 
     def event_resolve(self, check, client):
-        payload = { "client": client, "check": check }
-        url = '%s/event_resolveve' % self.api
-        response = requests.post(url, data=json.dumps(payload))
-        return response
+        url = '/events/%s/%s' % (client, check)
+        return self.request(url, "DELETE")
 
     @property
     def stash_list(self):
@@ -63,17 +70,22 @@ class Sensu(object):
     def client_list(self):
         return self.request('/clients')
 
-    @property
-    def event_list(self):
+    def event_list(self, request=None):
         events = self.request('/events')
         stashes = self.request('/stashes')
+        if include_kedb:
+            try:
+                events = kedb_api.event_list(events)
+            except requests.exceptions.ConnectionError:
+                if request:
+                    messages.error(request, "KEDB API is down !")
         stash_map = []
         for stash in stashes:
             stash_map.append(stash['path'])
         for event in events:
-            if '%s/%s' % (event['client'], event['check']) in stash_map:
+            if 'silence/%s/%s' % (event['client'], event['check']) in stash_map:
                 event['silenced'] = True
-            elif event['client'] in stash_map:
+            elif 'silence/%s'% event['client'] in stash_map:
                 event['silenced'] = True
             else:
                 event['silenced'] = False
@@ -86,12 +98,6 @@ class Sensu(object):
         url = '%s/events/%s/%s' % (self.api, client, check)
         response = requests.get(url)
         return response.json()
-
-    def event_resolve(self, check, client):
-        payload = { "client": client, "check": check }
-        url = '%s/resolve' % self.api
-        response = requests.post(url, data=json.dumps(payload))
-        return response
 
     def event_recheck(self, check, client):
         check_obj = self.check_detail(check)

@@ -1,13 +1,15 @@
 
-import requests
+import requests 
 import json
 import logging
-
+from horizon import messages
 from django.conf import settings
 
 log = logging.getLogger('utils.kedb')
 
-class Kedb(object):
+from horizon_contrib.api.base import BaseClient
+
+class Kedb(BaseClient):
 
     host = settings.KEDB_HOST
     port = settings.KEDB_PORT
@@ -15,16 +17,52 @@ class Kedb(object):
     def __init__(self):
         pass
 
-    def request(self, path):
-        request = requests.get('%s%s' % (self.api, path))
-        return request.json()
-
     @property
-    def api(self):
-        return 'http://%s:%s' % (self.host, self.port)
+    def workaround_list(self):
+        return self.request('/workarounds')
 
     @property
     def error_list(self):
-        return self.request('/api/known-errors')
+        return self.request('/known-errors')
+
+    def event_list(self, events):
+        url = '/events/'
+        payload = { "events": events }
+        return self.request(url, "POST", payload)
+
+    def event_detail(self, event):
+        url = '/events/detail/'
+        payload = { "event": event }
+        return self.request(url, "POST", payload)
+
+    def workaround_update(self, workaround, data=None):
+        """zapouzdruje jak detail tak update
+        """
+        url = '/workarounds/%s/' % (workaround)
+        if not data:
+            return self.request(url)
+        return self.request(url, "PUT", data)
+
+    def workaround_delete(self, workaround):
+        url = '/workarounds/%s/' % (workaround)
+        return self.request(url, "DELETE", {})
+
+    def workaround_create(self, workaround):
+        url = '/workarounds/'
+        return self.request(url, "POST", workaround)
+
+    def error_update(self, error, data=None):
+        url = '/known-errors/%s/' % (error)
+        if not data:
+            return self.request(url)
+        return self.request(url, "PUT", data)
+
+    def error_create(self, data, request=None):
+        url = '/known-errors/'
+        return self.request(url, "POST", data, request)
+
+    def error_delete(self, request, error):
+        url = '/known-errors/%s/' % (error)
+        return self.request(url, "DELETE", {}, request)
 
 kedb_api = Kedb()

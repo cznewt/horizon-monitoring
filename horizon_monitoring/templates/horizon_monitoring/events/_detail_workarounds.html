@@ -1,10 +1,9 @@
 {% load i18n %}
-{% load url from future %}
 
-<div class="clearfix">
-  <h3 class="pull-left">{% trans "Instance Console Log" %}</h3>
+{% block title %}{% trans "Workarounds" %}{% endblock %}
 
-    <label for="tail_length_select">{% trans "Log Length" %}</label>
-    <button class="btn btn-small btn-primary" type="submit">{% trans "Go" %}</button>
-    <a class="btn btn-small" target="_blank" href="{{ console_url }}">{% trans "View Full Log" %}</a>
-</div>
+{% block main %}
+{{ workarounds_table.render }}
+{{ test1 }}
+{{ test.render }}
+{% endblock %}

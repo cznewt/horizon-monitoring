@@ -6,7 +6,7 @@ from django.utils.http import urlencode
 
 from horizon_monitoring.utils.filters import join_list_with_newline
 from horizon_monitoring.utils.sensu_client import sensu_api
-
+from horizon_contrib.tables.actions import FilterAction
 
 class RequestCheck(tables.LinkAction):
     name = "request_check"
@@ -23,6 +23,8 @@ class SensuChecksTable(tables.DataTable):
     handlers = tables.Column('handlers', verbose_name=_("Handlers"), filters=(join_list_with_newline,))
     interval = tables.Column('interval', verbose_name=_("Interval"))
     command = tables.Column('command', verbose_name=_("Command"))
+    customer = tables.Column('customer', verbose_name=_("Customer"))
+    asset = tables.Column('asset', verbose_name=_("Asset"))
 
     def get_object_id(self, datum):
         return datum['name']
@@ -34,4 +36,4 @@ class SensuChecksTable(tables.DataTable):
         name = "checks"
         verbose_name = _("Service Checks Database")
         row_actions = (RequestCheck,)
-
+        table_actions = (FilterAction, )
